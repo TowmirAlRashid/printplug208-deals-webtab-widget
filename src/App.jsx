@@ -62,6 +62,7 @@ function App() {
       ),
     },
     { field: "Stage", headerName: "Stage", flex: 3, align: "left" },
+    { field: "Lead_Category", headerName: "Category", flex: 2, align: "left" },
     {
       field: "Closing_Date",
       headerName: "Closing Date",
