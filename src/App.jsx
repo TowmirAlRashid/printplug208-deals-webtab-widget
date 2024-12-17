@@ -9,6 +9,9 @@ function App() {
   const [initialized, setInitialized] = useState(false); // initialize the widget
   const [deals, setDeals] = useState(null);
 
+  const [categoryBasedDeals, setCategoryBasedDeals] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+
   useEffect(() => {
     // initialize the app
     ZOHO.embeddedApp.on("PageLoad", function (data) {
@@ -33,6 +36,28 @@ function App() {
           (a, b) => new Date(a.Closing_Date) - new Date(b.Closing_Date)
         );
         setDeals(currentDeals);
+
+        const dealFieldsResp = await ZOHO.CRM.META.getFields({
+          Entity: "Deals",
+        });
+        const currentDealCategoreisRaw = dealFieldsResp?.fields?.filter(
+          (field) => field?.api_name === "Lead_Category"
+        )?.[0]?.pick_list_values;
+
+        let categoryBasedDealsCount = {};
+        currentDealCategoreisRaw?.forEach((category) => {
+          categoryBasedDealsCount[category?.display_value] = 0;
+        });
+        currentDeals?.forEach((deal) => {
+          let dealCategoryList = deal?.Lead_Category;
+          dealCategoryList?.forEach((category) => {
+            categoryBasedDealsCount = {
+              ...categoryBasedDealsCount,
+              [category]: categoryBasedDealsCount?.[category] + 1,
+            };
+          });
+        });
+        setCategoryBasedDeals(categoryBasedDealsCount);
       };
 
       fetchData();
@@ -72,7 +97,7 @@ function App() {
     { field: "Amount", headerName: "Amount", flex: 1, align: "center" },
   ];
 
-  if (deals) {
+  if (deals && categoryBasedDeals) {
     return (
       <Box
         sx={{
@@ -98,10 +123,111 @@ function App() {
             Open Deals
           </Typography>
 
+          <Box sx={{ width: "100%", mb: 3 }}>
+            <Box
+              sx={{
+                width: "100%",
+                display: "flex",
+                justifyContent: "start",
+                alignItems: "center",
+                flexDirection: "row",
+                gap: 4,
+                mb: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: "1.1rem",
+                  fontWeight: "bold",
+                }}
+              >
+                Category Counting
+              </Typography>
+
+              {selectedCategories?.length > 0 && (
+                <Box
+                  sx={{
+                    border: "1px solid grey",
+                    p: "2px 4px",
+                    fontSize: "14px",
+                    borderRadius: "10px",
+                  }}
+                  onClick={() => setSelectedCategories([])}
+                >
+                  <strong>X</strong> Clear Filters
+                </Box>
+              )}
+            </Box>
+
+            <Box
+              sx={{
+                width: "100%",
+                display: "flex",
+                justifyContent: "start",
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 2,
+              }}
+            >
+              {Object.keys(categoryBasedDeals)?.map((category, index) => {
+                return (
+                  <Box
+                    key={index}
+                    sx={{
+                      border: "1px solid lightgrey",
+                      p: "4px 6px",
+                      borderRadius: "10px",
+                      "&:hover": {
+                        cursor: "pointer",
+                      },
+                      fontSize: "14px",
+                      bgcolor: selectedCategories?.includes(category)
+                        ? "grey"
+                        : "transparent",
+                      color: selectedCategories?.includes(category)
+                        ? "white"
+                        : "black",
+                    }}
+                    onClick={() =>
+                      setSelectedCategories((prev) => {
+                        if (!prev.includes(category)) {
+                          return [...prev, category];
+                        }
+                        return prev;
+                      })
+                    }
+                  >
+                    {category}{" "}
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        color: "white",
+                        border: "1px solid #4682B4",
+                        backgroundColor: "#4682B4",
+                        padding: "0 5px",
+                        borderRadius: "50%",
+                      }}
+                    >
+                      {categoryBasedDeals?.[category]}
+                    </span>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
           {/* put the datagrid here */}
-          <Paper sx={{ height: "80vh", width: "100%" }}>
+          <Paper sx={{ height: "67vh", width: "100%" }}>
             <DataGrid
-              rows={deals}
+              rows={deals?.filter((deal) => {
+                if (selectedCategories?.length > 0) {
+                  return deal?.Lead_Category?.some((category) =>
+                    selectedCategories.includes(category)
+                  );
+                }
+                return true; // If selectedCategories is empty, include all deals
+              })}
               columns={columns}
               pageSizeOptions={[5, 10]}
               sx={{ border: 0 }}
